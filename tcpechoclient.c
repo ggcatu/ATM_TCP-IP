@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <netdb.h>    
-#include <strings.h>
+#include <string.h>
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
    server.sin_port = htons(PORT); 
    /* htons() es necesaria nuevamente ;-o */
    server.sin_addr = *((struct in_addr *)he->h_addr);  
-   /*he->h_addr pasa la información de ``*he'' a "h_addr" */
+   /* he->h_addr pasa la información de ``*he'' a "h_addr" */
    bzero(&(server.sin_zero),8);
 
    if(connect(fd, (struct sockaddr *)&server,
@@ -66,11 +66,13 @@ int main(int argc, char *argv[])
       perror("error en connect()\n");
       exit(-1);
    }
-   buf[0] = '1';
+
    int opt;
    printf("Enviando identificacion\n");
    send(fd,argv[2],5,0);
-   while(buf[0] != '0'){
+   int i;
+
+   for(i = 0; i < 2; i++){
 
       if ((numbytes=recv(fd,buf,MAXDATASIZE,0)) == -1){  
          /* llamada a recv() */
@@ -86,7 +88,6 @@ int main(int argc, char *argv[])
       printf("Ha escogido la opcion %d\n", opt);
       sprintf(buf,"%d", opt);
       enviar(buf,fd);
-      
    }
 
 
