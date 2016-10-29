@@ -14,6 +14,7 @@
 #define MINICIAL 80000
 #define MAXIMORETIRO 3000
 #define MAXNRETIROS 3
+#define MAXMSG 300
 
 typedef enum {
 	deposito,
@@ -87,30 +88,43 @@ int incrementar_monto(int n){
 	return 1;
 }
 
+
+void format_messge(char * msg, char * m1, int code){
+	memset(msg, 0, MAXMSG);
+	sprintf(msg, "%d - %s", code, m1);
+}
+
 void manejador_deposito(struct cliente * c,int ds){
+	char message[MAXMSG];
 	char buffer[10];
 	int numbytes = 0;
 	int total;
 	c->instruccion = deposito;
 	printf("Iniciando manejador de deposito\n");
-  	enviar("Monto a depositar: \n", ds);
+	format_messge(message, "Monto a depositar: \n", 1);
+  	enviar(message, ds);
   	if ( (numbytes=recv(ds,buffer,10,0)) == -1){  
 	    perror("Error en la llamada Recv()");
 	    exit(-1);
 	}
 	total = atoi(buffer);
-	if (total <= 0){
+	if (total >= 0){
 		c->monto = total;
 		incrementar_monto(total);
 		printf("Monto recibido\n");
+		format_messge(message, "Su deposito se ha efectuado.\n", 2);
+  		enviar(message, ds);
 	} else {
 		printf("Error al depositar\n");
+		format_messge(message, "Ha ingresado un monto incorrecto, debe reiniciar la transaccion.\n", 2);
+  		enviar(message, ds);
 	}
 	return;
 }
 
 
 void manejador_retiro(struct cliente * c, int ds){
+	char message[MAXMSG];
 	char buffer[10];
 	int numbytes = 0;
 	int total, res;
@@ -118,9 +132,12 @@ void manejador_retiro(struct cliente * c, int ds){
 	printf("Iniciando manejador de retiro\n");
 	if (!verificarRetiros(c)){
 		printf("Ya ha exedido el limite de retiros diarios.\n");
+		format_messge(message, "Ya ha exedido el limite de retiros diarios.\n", 2);
+  		enviar(message, ds);
 		return;
 	}
-  	enviar("Monto a retirar: \n", ds);
+	format_messge(message, "Monto a retirar: \n", 1);
+  	enviar(message, ds);
   	if ( (numbytes=recv(ds,buffer,10,0)) == -1){  
 	    perror("Error en la llamada Recv()");
 	    exit(-1);
@@ -136,15 +153,20 @@ void manejador_retiro(struct cliente * c, int ds){
 
 	if (res < 0){
 		printf("No se ha efectuado la transaccion.\n");
+		format_messge(message, "Ha ingresado un monto incorrecto, debe reiniciar la transaccion. \n", 2);
+  		enviar(message, ds);
 		c->monto = 0;
 	} else {
 		printf("Monto retirado\n");
+		format_messge(message, "Ha retirado su dinero.\n", 2);
+  		enviar(message, ds);
 	}
 	return;
 }
 
 
 void atencion_cliente(void * fd){
+	char message[MAXMSG];
 	int descriptor = *(int *) fd;
 	struct cliente *c = (struct cliente *)malloc(sizeof(struct cliente));
 	//int p = 100;
@@ -164,7 +186,8 @@ void atencion_cliente(void * fd){
 		
 	}
 	printf("Usuario [ %s ] conectado.\n", c->name);
-	enviar("Bienvenido, se te ha asignado un proceso.\n Selecciona tu opcion: \n 1. Depositar \n 2. Retirar \n", descriptor);
+	format_messge(message, "Bienvenido, se te ha asignado un proceso.\n Selecciona tu opcion: \n 1. Depositar \n 2. Retirar \n", 1);
+	enviar(message, descriptor);
 	
 	if ( (numbytes=recv(descriptor,buffer,10,0)) == -1){  
 	    perror("Error en la llamada Recv()");

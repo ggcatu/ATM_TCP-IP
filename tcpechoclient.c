@@ -12,12 +12,25 @@
 #define PORT 3550         
 /* El Puerto Abierto del nodo remoto */
 
-#define MAXDATASIZE 100   
+#define MAXDATASIZE 300   
 /* El número máximo de datos en bytes */
+
+struct message {
+   int code;
+   char * message;
+};
 
 void enviar(char * string, int fd){
    int len = strlen(string);
    send(fd, string, len, 0);
+}
+
+void parse_message(struct message * msg, char * read){
+   msg->message = malloc(296 * sizeof(char));
+   if( sscanf(read, "%d - %[^\t]", &msg->code, msg->message) < 0){
+      printf("Error scanning: %s",read);
+   }
+   memset(read,0,MAXDATASIZE);
 }
 
 int main(int argc, char *argv[])
@@ -33,6 +46,8 @@ int main(int argc, char *argv[])
 
    struct sockaddr_in server;  
    /* información sobre la dirección del servidor */
+
+   struct message * msg = (struct message *) malloc(sizeof(struct message));
 
    if (argc !=3) { 
       /* esto es porque nuestro programa sólo necesitará un
@@ -71,27 +86,53 @@ int main(int argc, char *argv[])
    printf("Enviando identificacion\n");
    send(fd,argv[2],5,0);
    int i;
-
-   for(i = 0; i < 2; i++){
-
+   
+   // Recibiendo mensaje inicial
+   msg->code = 0;
+   while(msg->code != 3){
+      switch(msg->code){
+         case 0:
+            break;
+         case 1:
+            printf("Mensaje del Servidor: %s\n",msg->message);
+            scanf("%d", &opt);
+            sprintf(buf,"%d", opt);
+            enviar(buf,fd);
+            break;
+         case 2:
+            printf("%s\n",msg->message);
+            exit(1);
+            break;
+      }
       if ((numbytes=recv(fd,buf,MAXDATASIZE,0)) == -1){  
-         /* llamada a recv() */
          perror(" error Error \n");
          exit(-1);
       }
 
-      buf[numbytes]='\0';
-      if (numbytes != 0){
-         printf("Mensaje del Servidor: %s\n",buf); 
-      }
-      scanf("%d", &opt);
-      printf("Ha escogido la opcion %d\n", opt);
-      sprintf(buf,"%d", opt);
-      enviar(buf,fd);
+      parse_message(msg, buf);
    }
 
+   // for(i = 0; i < 2; i++){
+
+   //    if ((numbytes=recv(fd,buf,MAXDATASIZE,0)) == -1){  
+   //       /* llamada a recv() */
+   //       perror(" error Error \n");
+   //       exit(-1);
+   //    }
+
+   //    buf[numbytes]='\0';
+   //    if (numbytes != 0){
+   //       printf("Mensaje del Servidor: %s\n",buf); 
+   //    }
+   //    scanf("%d", &opt);
+   //  ;  printf("Ha escogido la opcion %d\n", opt);
+   //    sprintf(buf,"%d", opt);
+   //    enviar(buf,fd);
+   // }
 
 
-   close(fd);   /* cerramos fd =) */
+   free(msg);
+   close(fd);
+   /* cerramos fd =) */
 
 }
