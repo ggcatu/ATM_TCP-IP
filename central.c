@@ -67,7 +67,6 @@ int verificarRetiros(struct cliente * c){
 			k++;
 		}
 	}
-	printf("K: %d, IMOV %d\n", k, imov);
 	return k < 3;
 }
 
@@ -102,13 +101,14 @@ void manejador_deposito(struct cliente * c,int ds){
 	c->instruccion = deposito;
 	printf("Iniciando manejador de deposito\n");
 	format_messge(message, "Monto a depositar: \n", 1);
-  	enviar(message, ds);
+  	enviar(message, ds);	
   	if ( (numbytes=recv(ds,buffer,10,0)) == -1){  
 	    perror("Error en la llamada Recv()");
 	    exit(-1);
 	}
 	total = atoi(buffer);
-	if (total >= 0){
+	printf("%d ---%s \n",total, buffer);
+	if (total > 0){
 		c->monto = total;
 		incrementar_monto(total);
 		printf("Monto recibido\n");
@@ -186,7 +186,7 @@ void atencion_cliente(void * fd){
 		
 	}
 	printf("Usuario [ %s ] conectado.\n", c->name);
-	format_messge(message, "Bienvenido, se te ha asignado un proceso.\n Selecciona tu opcion: \n 1. Depositar \n 2. Retirar \n", 1);
+	format_messge(message, "Bienvenido, se te ha asignado un proceso.\n Selecciona tu opcion: \n -d. Depositar \n -r. Retirar \n", 0);
 	enviar(message, descriptor);
 	
 	if ( (numbytes=recv(descriptor,buffer,10,0)) == -1){  
