@@ -16,6 +16,7 @@
 
 /* Estructura de mensaje */
 struct message {
+   char len[3];
    int code;
    char * message;
 };
@@ -51,6 +52,13 @@ int conectar(int * fd, struct sockaddr_in * server){
    return -1;
 }
 
+void xor(char * string, int len){
+   int i;
+   for(i = 0; i < len; i++){
+      string[i] = string[i] ^ '`';
+   }
+}
+
 /* Funcion para decodificar los mensajes del servidor */
 /* msg es una estructura destino donde se decodificara el mensaje */
 /* read es el mensaje recibido desde el servidor */
@@ -66,6 +74,36 @@ void error_entrada(){
    printf("Uso: bsb_cli -d <nombre_módulo_atención> -p <puerto_bsb_svr> -c <op>[d|r] -i <codigo_usuario>");
    exit(-1);
 }
+
+void recibir_mensaje(char * buffer, int fd){
+   int numbytes, tam;
+   int ctam = 0;
+   char tamc[3] = "", amc[3]= "";
+   char tmensaje[300] = "", mensaje[300] = "";
+   
+   while( ctam < 3){
+      if ((numbytes=recv(fd,amc,3-ctam,0)) == -1){
+         perror(" error Error \n");
+         exit(-1);
+      }
+      strcat(tamc, amc);
+      ctam+=numbytes;
+   }
+   tam = atoi(tamc);
+   ctam = 0;
+   while( ctam < tam){
+      if ((numbytes=recv(fd,mensaje,tam - ctam,0)) == -1){
+            perror(" error Error \n");
+            exit(-1);
+      }
+      strcat(tmensaje, mensaje);
+      ctam += numbytes;
+   }
+   xor(tmensaje, tam);
+   strcpy(buffer, tmensaje);
+}
+
+
 
 int main(int argc, char *argv[])
 {
@@ -156,7 +194,7 @@ int main(int argc, char *argv[])
 
    /* manejador de mensajes recibidos */   
    msg->code = 10;
-   while(msg->code != 3){
+   while(msg->code != 9){
       switch(msg->code){
          case 0:
             /* enviando mensaje que indica tipo de transaccion */
@@ -176,11 +214,12 @@ int main(int argc, char *argv[])
             printf("%s\n",msg->message);
             exit(1);
             break;
+         case 3:
+            printf("%s\n",msg->message);
+            break;
       }
-      if ((numbytes=recv(fd,buf,MAXDATASIZE,0)) == -1){
-         perror(" error Error \n");
-         exit(-1);
-      }
+      
+      recibir_mensaje(buf, fd);
       parse_message(msg, buf);
    }
 

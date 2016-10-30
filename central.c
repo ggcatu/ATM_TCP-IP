@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <time.h>
 
 #define PUERTO 3550
 #define MAXCLIENT 100
@@ -32,6 +33,8 @@ int imov;
 pthread_mutex_t monto_mutex;
 pthread_mutex_t mov_mutex;
 struct cliente * movimientos[MAXCLIENT];
+
+
 
 void printmov(struct cliente * c){
 	char * inst[] = {"Deposito", "Retiro"};
@@ -70,8 +73,19 @@ int verificarRetiros(struct cliente * c){
 	return k < 3;
 }
 
+void xor(char * string, int len){
+	int i;
+	for(i = 0; i < len; i++){
+		string[i] = string[i] ^ '`';
+	}
+}
+
 void enviar(char * string, int fd){
+	char clen[3];
 	int len = strlen(string);
+	sprintf(clen, "%03d", len);
+	send(fd, clen, 3, 0);
+	xor(string,len);
 	send(fd, string, len, 0);
 }
 
@@ -86,7 +100,6 @@ int incrementar_monto(int n){
 	printf("New ammount: %d\n", monto_total);
 	return 1;
 }
-
 
 void format_messge(char * msg, char * m1, int code){
 	memset(msg, 0, MAXMSG);
@@ -112,11 +125,11 @@ void manejador_deposito(struct cliente * c,int ds){
 		c->monto = total;
 		incrementar_monto(total);
 		printf("Monto recibido\n");
-		format_messge(message, "Su deposito se ha efectuado.\n", 2);
+		format_messge(message, "Su deposito se ha efectuado.\n", 3);
   		enviar(message, ds);
 	} else {
 		printf("Error al depositar\n");
-		format_messge(message, "Ha ingresado un monto incorrecto, debe reiniciar la transaccion.\n", 2);
+		format_messge(message, "Ha ingresado un monto incorrecto, debe reiniciar la transaccion.\n", 3);
   		enviar(message, ds);
 	}
 	return;
@@ -132,7 +145,7 @@ void manejador_retiro(struct cliente * c, int ds){
 	printf("Iniciando manejador de retiro\n");
 	if (!verificarRetiros(c)){
 		printf("Ya ha exedido el limite de retiros diarios.\n");
-		format_messge(message, "Ya ha exedido el limite de retiros diarios.\n", 2);
+		format_messge(message, "Ya ha exedido el limite de retiros diarios.\n", 3);
   		enviar(message, ds);
 		return;
 	}
@@ -153,17 +166,32 @@ void manejador_retiro(struct cliente * c, int ds){
 
 	if (res < 0){
 		printf("No se ha efectuado la transaccion.\n");
-		format_messge(message, "Ha ingresado un monto incorrecto, debe reiniciar la transaccion. \n", 2);
+		format_messge(message, "Ha ingresado un monto incorrecto, debe reiniciar la transaccion. \n", 3);
   		enviar(message, ds);
 		c->monto = 0;
 	} else {
 		printf("Monto retirado\n");
-		format_messge(message, "Ha retirado su dinero.\n", 2);
+		format_messge(message, "Ha retirado su dinero.\n", 3);
   		enviar(message, ds);
 	}
 	return;
 }
 
+
+void enviar_hora(struct cliente * c, int descriptor){
+	char * inst[] = {"Deposito", "Retiro"};
+	time_t timer;
+    char buffer[26];
+    char r[100] = "Transaccion registrada: ";
+    char message[300];
+    struct tm* tm_info;
+    time(&timer);
+    tm_info = localtime(&timer);
+    strftime(buffer, 26, "%Y-%m-%d %H:%M:%S", tm_info);
+    sprintf(r,"%s [%s] = %s = %s",r,c->name,inst[(int)c->instruccion],buffer);
+	format_messge(message, r, 3);
+	enviar(message, descriptor);
+}
 
 void atencion_cliente(void * fd){
 	char message[MAXMSG];
@@ -185,9 +213,8 @@ void atencion_cliente(void * fd){
 		
 	}
 	printf("Usuario [ %s ] conectado.\n", c->name);
-	format_messge(message, "Bienvenido, se te ha asignado un proceso.\n Selecciona tu opcion: \n -d. Depositar \n -r. Retirar \n", 0);
+	format_messge(message, "Bienvenido, se te ha asignado un croceso.\n Selecciona tu opcion: \n -d. Depositar \n -r. Retirar \n", 0);
 	enviar(message, descriptor);
-	
 	if ( (numbytes=recv(descriptor,buffer,10,0)) == -1){  
 	    perror("Error en la llamada Recv()");
 	    exit(-1);
@@ -208,8 +235,11 @@ void atencion_cliente(void * fd){
   			return;
   		}
   	}
+  	enviar_hora(c,descriptor);
   	agregar_movimiento(c);
   	printf("Transaccion finalizada, cerrando descriptor %d\n", descriptor);
+	format_messge(message, "Transaccion finalizada.", 2);
+	enviar(message, descriptor);	
 	close(descriptor);
 	return;
 }
