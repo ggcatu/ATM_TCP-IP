@@ -26,20 +26,22 @@ struct cliente {
 	int monto;
 	transaccion instruccion;
 	char name[100];
+	char fecha[30];
 };
 
 int monto_total;
 int imov;
 pthread_mutex_t monto_mutex;
 pthread_mutex_t mov_mutex;
+pthread_mutex_t bit_mutex;
 struct cliente * movimientos[MAXCLIENT];
 
-
+char * inst[] = {"Deposito", "Retiro"};
 
 void printmov(struct cliente * c){
-	char * inst[] = {"Deposito", "Retiro"};
-	printf("Usuario: [ %s ] || Transaccion: %s || Monto: %d\n", c->name, inst[(int)c->instruccion], c->monto);
+	printf("%s - Usuario: [ %s ] || Transaccion: %s || Monto: %d\n", c->fecha, c->name, inst[(int)c->instruccion], c->monto);
 }
+
 void imprimir_movimientos(){
 	int i = 0;
 	for( i = 0; i < imov; i++){
@@ -47,9 +49,31 @@ void imprimir_movimientos(){
 	}
 }
 
+void inicializar_bitacora(){
+	FILE *f;
+    f = fopen("log.txt", "a");
+    fprintf(f, "#####################\n");
+    fprintf(f, "Inicializando dia...\n");
+    fclose(f);
+}
+
+void escribir_bitacora(char * string){
+	FILE *f;
+    f = fopen("log.txt", "a");
+    fprintf(f, "%s", string);
+    fclose(f);
+}
+
+void agregar_movimiento_bitacora(struct cliente * c){
+	char temp[200];
+	sprintf(temp, "%s - Usuario: [ %s ] || Transaccion: %s || Monto: %d\n", c->fecha, c->name, inst[(int)c->instruccion], c->monto);
+	escribir_bitacora(temp);
+}
+
 void inicializar(){
 	monto_total = MINICIAL;
 	imov = 0;
+	inicializar_bitacora();
 }
 
 void agregar_movimiento(struct cliente * c){
@@ -120,7 +144,6 @@ void manejador_deposito(struct cliente * c,int ds){
 	    exit(-1);
 	}
 	total = atoi(buffer);
-	printf("%d ---%s \n",total, buffer);
 	if (total > 0){
 		c->monto = total;
 		incrementar_monto(total);
@@ -187,7 +210,8 @@ void enviar_hora(struct cliente * c, int descriptor){
     struct tm* tm_info;
     time(&timer);
     tm_info = localtime(&timer);
-    strftime(buffer, 26, "%Y-%m-%d %H:%M:%S", tm_info);
+    strftime(c->fecha, 26, "%Y-%m-%d %H:%M:%S", tm_info);
+    strcpy(buffer,c->fecha);
     sprintf(r,"%s [%s] = %s = %s",r,c->name,inst[(int)c->instruccion],buffer);
 	format_messge(message, r, 3);
 	enviar(message, descriptor);
@@ -237,6 +261,7 @@ void atencion_cliente(void * fd){
   	}
   	enviar_hora(c,descriptor);
   	agregar_movimiento(c);
+  	agregar_movimiento_bitacora(c);
   	printf("Transaccion finalizada, cerrando descriptor %d\n", descriptor);
 	format_messge(message, "Transaccion finalizada.", 2);
 	enviar(message, descriptor);	

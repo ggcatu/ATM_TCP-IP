@@ -1,0 +1,8 @@
+#####################
+Inicializando dia...
+#####################
+Inicializando dia...
+2016-10-30 15:10:44 - Usuario: [ 2332 ] || Transaccion: Retiro || Monto: -2
+2016-10-30 15:10:48 - Usuario: [ 2332 ] || Transaccion: Retiro || Monto: -233
+2016-10-30 15:11:01 - Usuario: [ 2332 ] || Transaccion: Retiro || Monto: -534
+2016-10-30 15:13:08 - Usuario: [ 2332 ] || Transaccion: Deposito || Monto: 5000
