@@ -7,14 +7,11 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <errno.h>
-
-/* El Puerto Abierto del nodo remoto */
-#define PORT 3550         
 
 /* El número máximo de datos en bytes */
 #define MAXDATASIZE 300   
 
+/* El numero maximo de intentos */
 #define MAXRETRY 3
 
 /* Estructura de mensaje */
@@ -54,7 +51,6 @@ int conectar(int * fd, struct sockaddr_in * server){
    return -1;
 }
 
-
 /* Funcion para decodificar los mensajes del servidor */
 /* msg es una estructura destino donde se decodificara el mensaje */
 /* read es el mensaje recibido desde el servidor */
@@ -66,10 +62,15 @@ void parse_message(struct message * msg, char * read){
    memset(read,0,MAXDATASIZE);
 }
 
+void error_entrada(){
+   printf("Uso: bsb_cli -d <nombre_módulo_atención> -p <puerto_bsb_svr> -c <op>[d|r] -i <codigo_usuario>");
+   exit(-1);
+}
+
 int main(int argc, char *argv[])
 {
    /* ficheros descriptores */
-   int fd, numbytes, flags, port, opcion;       
+   int fd, numbytes, flags, port, opcion, opt;       
    int dflag = 0,pflag = 0,cflag = 0,iflag = 0;
    char * dvalue,* pvalue,* cvalue,* ivalue;
 
@@ -85,11 +86,11 @@ int main(int argc, char *argv[])
    /* estructura donde se recibiran los mensajes del servidor */
    struct message * msg = (struct message *) malloc(sizeof(struct message));
 
-   /* esto es porque nuestro programa necesitará dos argumenos, la IP, la identificacion*/
+   /* esto es porque nuestro programa necesitará varios argumentos*/
    if (argc != 9) { 
-      printf("Uso: bsb_cli -d <nombre_módulo_atención> -p <puerto_bsb_svr> -c <op>[d|r] -i <codigo_usuario>");
-      exit(-1);
+      error_entrada();
    }
+   /* manejador de argumentos */
    while (( flags = getopt(argc, argv, "d:p:c:i:")) != -1){
     switch(flags){
        case 'd':
@@ -109,11 +110,13 @@ int main(int argc, char *argv[])
            ivalue = optarg;
            break;
        default:
-         printf("Uso: bsb_cli -d <nombre_módulo_atención> -p <puerto_bsb_svr> -c <op>[d|r] -i <codigo_usuario>");
-         exit(-1);
+         error_entrada();
        }
    }
-
+   if (dflag + pflag + cflag + iflag != 4){
+      error_entrada();
+   }
+   /* transformacion del argumento -c */
    if (cvalue[0] == 'd'){
       opcion = 1;
    } else if (cvalue[0] == 'r'){
@@ -132,39 +135,44 @@ int main(int argc, char *argv[])
       exit(-1);
    }
 
-   server.sin_family = AF_INET;
+   /* argumento -p */
    port = atoi(pvalue);
+
+   /* configuracion del servidor donde nos conectaremos */   
+   server.sin_family = AF_INET;
    server.sin_port = htons(port); 
-   /* htons() es necesaria nuevamente ;-o */
    server.sin_addr = *((struct in_addr *)he->h_addr);  
-   /* he->h_addr pasa la información de ``*he'' a "h_addr" */
    bzero(&(server.sin_zero),8);
 
+   /* nos intentaremos conectar al servidor 3 veces */
    if ( conectar(&fd,&server) == -1){
       printf("El servidor no responde.\n");
       exit(-1);
    };
-   int opt;
-   int i;
+
+   /* se envia la identificacion del usuario */
    printf("Enviando identificacion\n");
    send(fd,ivalue,5,0);
-   
-   // Recibiendo mensaje inicial
+
+   /* manejador de mensajes recibidos */   
    msg->code = 10;
    while(msg->code != 3){
       switch(msg->code){
          case 0:
+            /* enviando mensaje que indica tipo de transaccion */
             printf("%s\n",msg->message);
             sprintf(buf,"%d", opcion);
             enviar(buf,fd);
             break;
          case 1:
+            /* el servidor nos esta requiriendo una respuesta numerica */
             printf("Mensaje del Servidor: %s\n",msg->message);
             scanf("%d", &opt);
             sprintf(buf,"%d", opt);
             enviar(buf,fd);
             break;
          case 2:
+            /* el servidor nos indica que debemos mostrar un mensaje y cerrar nuestro cliente */
             printf("%s\n",msg->message);
             exit(1);
             break;

@@ -169,7 +169,6 @@ void atencion_cliente(void * fd){
 	char message[MAXMSG];
 	int descriptor = *(int *) fd;
 	struct cliente *c = (struct cliente *)malloc(sizeof(struct cliente));
-	//int p = 100;
 	int numbytes = 0;
 	char buffer[10];
 
