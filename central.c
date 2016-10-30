@@ -29,19 +29,21 @@ struct cliente {
 	char fecha[30];
 };
 
-int monto_total;
-int imov;
+int monto_total, imov;
+FILE *f;
 pthread_mutex_t monto_mutex;
 pthread_mutex_t mov_mutex;
 pthread_mutex_t bit_mutex;
 struct cliente * movimientos[MAXCLIENT];
-
 char * inst[] = {"Deposito", "Retiro"};
 
+/* funcion que permite imprimir en pantalla un movimiento */
+/* c estructura de cliente a imprimir */
 void printmov(struct cliente * c){
 	printf("%s - Usuario: [ %s ] || Transaccion: %s || Monto: %d\n", c->fecha, c->name, inst[(int)c->instruccion], c->monto);
 }
 
+/* funcion que permite imprimir todos las transacciones efectuadas en un dia */
 void imprimir_movimientos(){
 	int i = 0;
 	for( i = 0; i < imov; i++){
@@ -49,33 +51,41 @@ void imprimir_movimientos(){
 	}
 }
 
+/* funcion de inicializacion de la bitacora */
 void inicializar_bitacora(){
-	FILE *f;
     f = fopen("log.txt", "a");
     fprintf(f, "#####################\n");
     fprintf(f, "Inicializando dia...\n");
     fclose(f);
 }
 
+/* funcion para escribir un string en la bitacora */
+/* string texto a ser escrito en la bitacora */
 void escribir_bitacora(char * string){
-	FILE *f;
+   	pthread_mutex_lock( &bit_mutex );
     f = fopen("log.txt", "a");
     fprintf(f, "%s", string);
     fclose(f);
+   	pthread_mutex_unlock( &bit_mutex );
 }
 
+/* funcion para escribir un movimiento en la bitacora */
+/* c movimiento a escribir en la bitacora */
 void agregar_movimiento_bitacora(struct cliente * c){
 	char temp[200];
 	sprintf(temp, "%s - Usuario: [ %s ] || Transaccion: %s || Monto: %d\n", c->fecha, c->name, inst[(int)c->instruccion], c->monto);
 	escribir_bitacora(temp);
 }
 
+/* funcion de inicializacion de dia de la central */
 void inicializar(){
 	monto_total = MINICIAL;
 	imov = 0;
 	inicializar_bitacora();
 }
 
+/* funcion para guardar un movimiento en nuestra memoria */
+/* movimiento a ser guardado */
 void agregar_movimiento(struct cliente * c){
 	pthread_mutex_lock( &mov_mutex );
 	// Escribir movimiento en bitacora;
@@ -84,9 +94,10 @@ void agregar_movimiento(struct cliente * c){
 	pthread_mutex_unlock( &mov_mutex );
 }
 
+/* funcion para verificar que una persona no retire mas de MAXNRETIRO veces en un dia */
+/* c cliente que busca retirar */
 int verificarRetiros(struct cliente * c){
 	imprimir_movimientos();
-	// Necesita mutex?
 	int i,k=0;
 	struct cliente * temp; 
 	for( i = 0; i < imov; i++){
@@ -94,9 +105,12 @@ int verificarRetiros(struct cliente * c){
 			k++;
 		}
 	}
-	return k < 3;
+	return k < MAXNRETIROS;
 }
 
+/* funcion para encriptar nuestros mensajes */
+/* string mensaje a ser encriptado */
+/* len largo del mensaje a ser encriptado */
 void xor(char * string, int len){
 	int i;
 	for(i = 0; i < len; i++){
@@ -104,6 +118,11 @@ void xor(char * string, int len){
 	}
 }
 
+/* funcion de comunicacion con el cliente, permite cumplir 
+facilemente con el protocolo asi como con la encriptacion */
+
+/* string mensaje a ser enviado, ya con el formato del protocolo */
+/* fd file descriptor por donde se enviara el mensaje */
 void enviar(char * string, int fd){
 	char clen[3];
 	int len = strlen(string);
@@ -113,6 +132,8 @@ void enviar(char * string, int fd){
 	send(fd, string, len, 0);
 }
 
+/* funcion que permite el incremento/decremento del total del cajero */
+/* n diferencia del monto total a procesar*/
 int incrementar_monto(int n){
 	if( -n > monto_total || -n > MAXIMORETIRO ){
 		printf("ERROR\n");
@@ -125,11 +146,18 @@ int incrementar_monto(int n){
 	return 1;
 }
 
+/* estructura el mensaje para cumplir con el protocolo */
+/* msg buffer de resultado */
+/* m1  texto a enviar */
+/* code codigo de protocolo a enviar */
 void format_messge(char * msg, char * m1, int code){
 	memset(msg, 0, MAXMSG);
 	sprintf(msg, "%d - %s", code, m1);
 }
 
+/* modulo de depositos, una vez recibida una solicitud de deposito */
+/* c estructura de cliente para almacenar la transaccion */
+/* ds descriptor utilizado para la comunicacion con el cliente */
 void manejador_deposito(struct cliente * c,int ds){
 	char message[MAXMSG];
 	char buffer[10];
@@ -158,7 +186,9 @@ void manejador_deposito(struct cliente * c,int ds){
 	return;
 }
 
-
+/* modulo de retiros, una vez recibida una solicitud de retiro */
+/* c estructura de cliente para almacenar la transaccion */
+/* ds descriptor utilizado para la comunicacion con el cliente */
 void manejador_retiro(struct cliente * c, int ds){
 	char message[MAXMSG];
 	char buffer[10];
@@ -200,7 +230,9 @@ void manejador_retiro(struct cliente * c, int ds){
 	return;
 }
 
-
+/* funcion para enviar el comprobante al cajero para ser emitido */
+/* c transaccion efectuada */
+/* descriptor file descriptor de comunicacion con el cajero */
 void enviar_hora(struct cliente * c, int descriptor){
 	char * inst[] = {"Deposito", "Retiro"};
 	time_t timer;
@@ -217,6 +249,8 @@ void enviar_hora(struct cliente * c, int descriptor){
 	enviar(message, descriptor);
 }
 
+/* modulo de atencion al cliente, una vez recibida una solicitud de conexion */
+/* fd descriptor utilizado para la comunicacion con el cliente */
 void atencion_cliente(void * fd){
 	char message[MAXMSG];
 	int descriptor = *(int *) fd;
