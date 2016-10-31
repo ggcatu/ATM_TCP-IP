@@ -14,10 +14,6 @@
 /* El numero maximo de intentos */
 #define MAXRETRY 3
 
-
-
-
-
 /* Estructura de mensaje */
 struct message {
    char len[3];
@@ -78,7 +74,7 @@ void parse_message(struct message * msg, char * read){
 }
 
 void error_entrada(){
-   printf("Uso: bsb_cli -d <nombre_módulo_atención> -p <puerto_bsb_svr> -c <op>[d|r] -i <codigo_usuario>");
+   printf("Uso: bsb_cli -d <nombre_módulo_atención> -p <puerto_bsb_svr> -c <op>[d|r] -i <codigo_usuario>\n");
    exit(-1);
 }
 

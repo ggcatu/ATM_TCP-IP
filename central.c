@@ -11,7 +11,7 @@
 #include <netinet/in.h>
 #include <time.h>
 
-#define PUERTO 3550
+//#define PUERTO 3550
 #define MAXCLIENT 100
 #define MINICIAL 8000
 #define MAXIMORETIRO 3000
@@ -34,13 +34,14 @@ struct cliente {
 	char error_message[100];
 };
 
-int monto_total, imov;
+int monto_total, imov, fsocket;
 FILE *f;
 pthread_mutex_t monto_mutex;
 pthread_mutex_t mov_mutex;
 pthread_mutex_t bit_mutex;
 struct cliente * movimientos[MAXCLIENT];
 char * inst[] = {"Deposito", "Retiro", "Invalida"};
+char * dvalue, * fretiro, * fdeposito;
 
 /* funcion que permite imprimir en pantalla un movimiento */
 /* c estructura de cliente a imprimir */
@@ -56,30 +57,32 @@ void imprimir_movimientos(){
 	}
 }
 
-/* funcion de inicializacion de la bitacora */
-void inicializar_bitacora(){
-    f = fopen("log.txt", "a");
-    fprintf(f, "#####################\n");
-    fprintf(f, "Inicializando dia...\n");
-    fclose(f);
-}
-
 /* funcion para escribir un string en la bitacora */
 /* string texto a ser escrito en la bitacora */
-void escribir_bitacora(char * string){
+void escribir_bitacora(char * string, char * file){
    	pthread_mutex_lock( &bit_mutex );
-    f = fopen("log.txt", "a");
+    f = fopen(file, "a");
     fprintf(f, "%s", string);
     fclose(f);
    	pthread_mutex_unlock( &bit_mutex );
 }
 
+/* funcion de inicializacion de la bitacora */
+void inicializar_bitacora(){
+    char temp[100];
+    sprintf(temp, "# INICIALIZANDO DIA #\n");
+	escribir_bitacora(temp, fdeposito);
+	escribir_bitacora(temp, fretiro);
+}
+
 /* funcion de finalizacion de dia para la bitacora */
 void finalizar_bitacora(){
-	f = fopen("log.txt", "a");
-    fprintf(f, "Cerrando dia. Monto disponible: %d\n", monto_total);
-    fclose(f);
+	char temp[100];
+    sprintf(temp, "Cerrando dia. Monto disponible: %d\n", monto_total);
+	escribir_bitacora(temp, fdeposito);
+	escribir_bitacora(temp, fretiro);
 }
+
 
 /* funcion para escribir un movimiento en la bitacora */
 /* c movimiento a escribir en la bitacora */
@@ -90,7 +93,11 @@ void agregar_movimiento_bitacora(struct cliente * c){
 	} else {
 		sprintf(temp, "%s - Usuario: [ %s ] || Transaccion: %s || Monto: %d\n", c->fecha, c->name, inst[(int)c->instruccion], c->monto);
 	}
-	escribir_bitacora(temp);
+	if(c->instruccion == deposito){
+		escribir_bitacora(temp,fdeposito);
+	} else {
+		escribir_bitacora(temp,fretiro);
+	}
 }
 
 /* funcion de inicializacion de dia de la central */
@@ -104,6 +111,7 @@ void inicializar(){
 /* funcion de finalizacion del cajero */
 void finalizar(){
 	finalizar_bitacora();
+	close(fsocket);
 	exit(1);
 }
 
@@ -266,7 +274,6 @@ void manejador_retiro(struct cliente * c, int ds){
 		res = incrementar_monto(total);
 	}
 
-	// Se intento retirar mas de lo que hay en el cajero
 	if (res == -1){
 		c->monto = 0;
 		set_error(c, "Debe retirar un monto <= 3000.", ds);
@@ -312,7 +319,7 @@ void atencion_cliente(void * fd){
 	int descriptor = *(int *) fd;
 	struct cliente *c = (struct cliente *)malloc(sizeof(struct cliente));
 	int numbytes = 0, opcion;
-	char buffer[10];
+	char buffer[300];
 
 	c->error = 0;
 	printf("Esperando identificacion de usuario..\n");
@@ -361,46 +368,79 @@ void atencion_cliente(void * fd){
 	return;
 }
 
+void error_entrada(){
+   printf("Uso: bsb_svr -l <puerto a ofrecer> -i <bitacora de deposito> -o <bitacora de retiro>\n");
+   exit(-1);
+}
+
 int main(int argc, char *argv[]){
-	inicializar();
 	signal(SIGPIPE, SIG_IGN);
 	signal(SIGINT, reiniciar);
 	signal(SIGTSTP, finalizar);
-	int fde, fd2, numbytes;
+	char * lvalue;
+	int fd2, numbytes, flags, lflag, iflag, oflag, port;
 	struct sockaddr_in server; 
    	struct sockaddr_in client;
    	pthread_t client_t;
    	int size_sock = sizeof(struct sockaddr_in);
    	int option = 1;
+
+   	while (( flags = getopt(argc, argv, "l:i:o:")) != -1){
+    switch(flags){
+       case 'l':
+           lflag = 1;
+           lvalue = optarg;
+           break;
+       case 'i':
+           iflag = 1;
+           fdeposito = optarg;
+           break;
+       case 'o':
+           oflag = 1;
+           fretiro = optarg;
+           break;
+       default:
+         error_entrada();
+       }
+    }
+
+    port = atoi(lvalue);
+    if (oflag + iflag + lflag != 3){
+    	error_entrada();
+    	exit(-1);
+    }
+
+    inicializar();
+
    	// Creando socket
    	// int socket(int domain, int type, int protocol);  
-	if ( ( fde = socket(AF_INET, SOCK_STREAM, 0) ) == -1 ) {
+	if ( ( fsocket = socket(AF_INET, SOCK_STREAM, 0) ) == -1 ) {
 		perror("Error en la llamada Socket()");
 		exit(-1);
 	}
-	setsockopt(fde, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
+	setsockopt(fsocket, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
 
 	// Configurando estructura para el bind
 	memset(&server, 0, sizeof(server)); 
     server.sin_family = AF_INET;         
-    server.sin_port = htons(PUERTO); 
+    server.sin_port = htons(port); 
     server.sin_addr.s_addr = INADDR_ANY; 
     
     //int bind(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
-    if ( bind(fde, (struct sockaddr *) & server, sizeof(server) ) == -1){
+    if ( bind(fsocket, (struct sockaddr *) & server, sizeof(server) ) == -1){
     	perror("Error en la llamada de Bind()");
     	exit(-1);
 
     }
 
     //int listen(int sockfd, int backlog);
-    if ( listen(fde, MAXCLIENT) == -1){
+    if ( listen(fsocket, MAXCLIENT) == -1){
     	perror("Error en la llamada de Listen()");
     	exit(-1);
     }
 
     while(1){
-    	if ( (fd2 = accept(fde, NULL , NULL))  < -1){
+    	if ( (fd2 = accept(fsocket, NULL , NULL))  < -1){
 	    		perror("Error en el Accept()");
 	    		exit(-1);
 	    }
