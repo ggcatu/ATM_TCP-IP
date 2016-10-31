@@ -1,7 +1,8 @@
 # ATM_TCP-IP
 
-Gabriel Gimenez 12-11006
-Guillermo Betancourt 11-10103
+**Gabriel Gimenez 12-11006**
+
+**Guillermo Betancourt 11-10103**
 
 ## Archivos 
     Makefile, contiene el makefile
@@ -49,6 +50,7 @@ Durante la creacion se utilizaron como codigo_usuario, numeros de 4 digitos.
 ## Condiciones:
 
 Servidor:
+
     Maximo de clientes 100
     Monto inicial del cajero 8000
     Maximo monto de retiro 3000
@@ -63,6 +65,7 @@ Servidor:
     Los montos recibidos desde el cliente deben tener maximo 10 caracteres
 
 Cliente:
+
     Largo maximo de mensaje del protocolo 300
     Numero maximo de intentos para conectar al servidor 3
     Codigo de usuario 100 caracteres
