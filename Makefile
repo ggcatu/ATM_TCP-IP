@@ -1,13 +1,13 @@
 CC = gcc
 CFLAGS = -g
 
-all : central tcpechoclient 
+all : bsb_svr bsb_cli 
 
-central : central.c
-	$(CC) $(CFLAGS) -o central central.c -lpthread
+bsb_svr : central.c
+	$(CC) $(CFLAGS) -o bsb_svr central.c -lpthread
 
-tcpechoclient : tcpechoclient.c 
-	$(CC) $(CFLAGS) -o tcpechoclient tcpechoclient.c
+bsb_cli : tcpechoclient.c 
+	$(CC) $(CFLAGS) -o bsb_cli tcpechoclient.c
 
 clear :
 	rm *.o
