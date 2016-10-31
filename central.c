@@ -13,7 +13,7 @@
 #include "general.c"
 
 #define MAXCLIENT 100
-#define MINICIAL 8000
+#define MINICIAL 80000
 #define MAXIMORETIRO 3000
 #define MAXNRETIROS 3
 #define MAXDATASIZE 300
