@@ -328,7 +328,8 @@ void atencion_cliente(void * fd){
   	agregar_movimiento_bitacora(c);
   	printf("Transaccion finalizada, cerrando descriptor %d\n", descriptor);
 	format_messge(message, "Transaccion finalizada.", 2);
-	enviar(message, descriptor);	
+	enviar(message, descriptor);
+	free(c->last_packet.message);
 	close(descriptor);
 	return;
 }

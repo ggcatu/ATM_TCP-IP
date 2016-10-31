@@ -7,16 +7,17 @@ Archivos:
 	Makefile, contiene el makefile
 	central.c, contiene el codigo fuente del servidor
 	tcpechoclient.c, contiene el codigo fuente del cliente
+	general.c, contiene funciones y estructuras que utilizan ambos programas
 
 Se creo un sistema de cajero automatico, que permite retirar y depositar dinero desde el cliente.
 	
 Para generar los ejecutables:
-	make
+	`make`
 
 El cajero automatico consta de 2 partes.
 
 El servidor, puede ser invocado en base a las siguientes especificaciones
-	bsb_svr -l <puerto_bsb_svr> -i <bitácora_depósito> - o <bitácora_retiro>
+	`bsb_svr -l <puerto_bsb_svr> -i <bitácora_depósito> - o <bitácora_retiro>`
 
 Dónde:
 	<puerto_bsb_svr> Es el número de puerto local en que el computador central
@@ -27,7 +28,7 @@ Dónde:
 	texto que almacena las operaciones de retiro del cajero.
 
 El cliente, puede ser invocado en base a las siguientes especificaciones
-	bsb_cli -d <nombre_módulo_atención> -p <puerto_bsb_svr> - c <op> -i <codigo_usuario>
+	`bsb_cli -d <nombre_módulo_atención> -p <puerto_bsb_svr> - c <op> -i <codigo_usuario>`
 
 Dónde:
 	<nombre_módulo_atención>: Es el nombre de dominio o la dirección IP (versión 4)
