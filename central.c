@@ -11,7 +11,7 @@
 #include <netinet/in.h>
 #include <time.h>
 #include "general.c"
-//#define PUERTO 3550
+
 #define MAXCLIENT 100
 #define MINICIAL 8000
 #define MAXIMORETIRO 3000
@@ -105,8 +105,12 @@ void inicializar(){
 
 /* funcion de finalizacion del cajero */
 void finalizar(){
+	int i;
 	finalizar_bitacora();
 	close(fsocket);
+	for( i = 0; i < imov; i++){
+		free(movimientos[i]);
+	}
 	exit(1);
 }
 
@@ -146,7 +150,7 @@ int verificarRetiros(struct cliente * c){
 /* mensaje mensaje de error */
 /* ds descriptor del cliente */
 void set_error(struct cliente * c, char * mensaje, int ds){
-	char message[300];
+	char message[MAXDATASIZE];
 	c->error = 1;
 	strcpy(c->error_message,mensaje);
 	printf("%s\n", mensaje);
@@ -207,7 +211,7 @@ void manejador_deposito(struct cliente * c,int ds){
 /* ds descriptor utilizado para la comunicacion con el cliente */
 void manejador_retiro(struct cliente * c, int ds){
 	char message[MAXDATASIZE];
-	char buffer[300];
+	char buffer[MAXDATASIZE];
 	int numbytes = 0;
 	int total, res;
 	c->instruccion = retiro;
@@ -260,7 +264,7 @@ void enviar_comprobante(struct cliente * c, int descriptor){
 	time_t timer;
     char buffer[26];
     char r[100] = "Transaccion registrada: ";
-    char message[300];
+    char message[MAXDATASIZE];
     struct tm* tm_info;
     time(&timer);
     tm_info = localtime(&timer);

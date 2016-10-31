@@ -83,7 +83,7 @@ void enviar(char * string, int fd){
 /* msg es una estructura destino donde se decodificara el mensaje */
 /* read es el mensaje recibido desde el servidor */
 void parse_message(struct message * msg, char * read){
-   msg->message = malloc(296 * sizeof(char));
+   msg->message = malloc((MAXDATASIZE-4) * sizeof(char));
    if( sscanf(read, "%d - %[^\t]", &msg->code, msg->message) < 0){
       printf("Error scanning: %s",read);
    }
