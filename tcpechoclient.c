@@ -108,7 +108,7 @@ void recibir_mensaje(char * buffer, int fd){
 int main(int argc, char *argv[])
 {
    /* ficheros descriptores */
-   int fd, numbytes, flags, port, opcion, opt;       
+   int fd, numbytes, flags, port, opcion = 0, opt;       
    int dflag = 0,pflag = 0,cflag = 0,iflag = 0;
    char * dvalue,* pvalue,* cvalue,* ivalue;
 
@@ -205,7 +205,10 @@ int main(int argc, char *argv[])
          case 1:
             /* el servidor nos esta requiriendo una respuesta numerica */
             printf("Mensaje del Servidor: %s\n",msg->message);
-            scanf("%d", &opt);
+            if (scanf("%d", &opt) == 0){
+               printf("Se ha ingresado un valor incorrecto, reinicie la operacion.\n");
+               exit(-1);
+            }
             sprintf(buf,"%d", opt);
             enviar(buf,fd);
             break;

@@ -12,21 +12,25 @@
 
 #define PUERTO 3550
 #define MAXCLIENT 100
-#define MINICIAL 80000
+#define MINICIAL 8000
 #define MAXIMORETIRO 3000
 #define MAXNRETIROS 3
 #define MAXMSG 300
+#define NAVISORETIRO 5000
 
 typedef enum {
 	deposito,
-	retiro
+	retiro,
+	invalida
 } transaccion;
 
 struct cliente {
 	int monto;
+	int error;
 	transaccion instruccion;
 	char name[100];
 	char fecha[30];
+	char error_message[100];
 };
 
 int monto_total, imov;
@@ -35,7 +39,7 @@ pthread_mutex_t monto_mutex;
 pthread_mutex_t mov_mutex;
 pthread_mutex_t bit_mutex;
 struct cliente * movimientos[MAXCLIENT];
-char * inst[] = {"Deposito", "Retiro"};
+char * inst[] = {"Deposito", "Retiro", "Invalida"};
 
 /* funcion que permite imprimir en pantalla un movimiento */
 /* c estructura de cliente a imprimir */
@@ -69,11 +73,22 @@ void escribir_bitacora(char * string){
    	pthread_mutex_unlock( &bit_mutex );
 }
 
+/* funcion de finalizacion de dia para la bitacora */
+void finalizar_bitacora(){
+	f = fopen("log.txt", "a");
+    fprintf(f, "Cerrando dia. Monto disponible: %d", monto_total);
+    fclose(f);
+}
+
 /* funcion para escribir un movimiento en la bitacora */
 /* c movimiento a escribir en la bitacora */
 void agregar_movimiento_bitacora(struct cliente * c){
 	char temp[200];
-	sprintf(temp, "%s - Usuario: [ %s ] || Transaccion: %s || Monto: %d\n", c->fecha, c->name, inst[(int)c->instruccion], c->monto);
+	if(c->error){
+		sprintf(temp, "%s - Usuario: [ %s ] || Transaccion: %s || Monto: %d || Error: %s \n", c->fecha, c->name, inst[(int)c->instruccion], c->monto, c->error_message);
+	} else {
+		sprintf(temp, "%s - Usuario: [ %s ] || Transaccion: %s || Monto: %d\n", c->fecha, c->name, inst[(int)c->instruccion], c->monto);
+	}
 	escribir_bitacora(temp);
 }
 
@@ -118,6 +133,16 @@ void xor(char * string, int len){
 	}
 }
 
+
+/* estructura el mensaje para cumplir con el protocolo */
+/* msg buffer de resultado */
+/* m1  texto a enviar */
+/* code codigo de protocolo a enviar */
+void format_messge(char * msg, char * m1, int code){
+	memset(msg, 0, MAXMSG);
+	sprintf(msg, "%d - %s", code, m1);
+}
+
 /* funcion de comunicacion con el cliente, permite cumplir 
 facilemente con el protocolo asi como con la encriptacion */
 
@@ -132,11 +157,26 @@ void enviar(char * string, int fd){
 	send(fd, string, len, 0);
 }
 
+
+void set_error(struct cliente * c, char * mensaje, int ds){
+	char message[300];
+	c->error = 1;
+	strcpy(c->error_message,mensaje);
+	printf("%s\n", mensaje);
+	format_messge(message, mensaje, 3);
+	enviar(message, ds);
+
+}
+
 /* funcion que permite el incremento/decremento del total del cajero */
 /* n diferencia del monto total a procesar*/
 int incrementar_monto(int n){
-	if( -n > monto_total || -n > MAXIMORETIRO ){
-		printf("ERROR\n");
+	if( -n > monto_total ){
+		printf("Se intento retirar mas de lo que posee el cajero.\n");
+		return -2;
+	}
+	if ( -n > MAXIMORETIRO ){
+		printf("No se puede retirar mas de 3000.\n");
 		return -1;
 	}
 	pthread_mutex_lock( &monto_mutex );
@@ -144,15 +184,6 @@ int incrementar_monto(int n){
 	pthread_mutex_unlock( &monto_mutex );
 	printf("New ammount: %d\n", monto_total);
 	return 1;
-}
-
-/* estructura el mensaje para cumplir con el protocolo */
-/* msg buffer de resultado */
-/* m1  texto a enviar */
-/* code codigo de protocolo a enviar */
-void format_messge(char * msg, char * m1, int code){
-	memset(msg, 0, MAXMSG);
-	sprintf(msg, "%d - %s", code, m1);
 }
 
 /* modulo de depositos, una vez recibida una solicitud de deposito */
@@ -179,9 +210,7 @@ void manejador_deposito(struct cliente * c,int ds){
 		format_messge(message, "Su deposito se ha efectuado.\n", 3);
   		enviar(message, ds);
 	} else {
-		printf("Error al depositar\n");
-		format_messge(message, "Ha ingresado un monto incorrecto, debe reiniciar la transaccion.\n", 3);
-  		enviar(message, ds);
+		set_error(c, "Se ingreso un monto incorrecto.", ds);
 	}
 	return;
 }
@@ -198,9 +227,13 @@ void manejador_retiro(struct cliente * c, int ds){
 	printf("Iniciando manejador de retiro\n");
 	if (!verificarRetiros(c)){
 		printf("Ya ha exedido el limite de retiros diarios.\n");
-		format_messge(message, "Ya ha exedido el limite de retiros diarios.\n", 3);
-  		enviar(message, ds);
+		set_error(c, "Ya ha exedido el limite de retiros diarios.", ds);
 		return;
+	}
+	if(monto_total < NAVISORETIRO){
+		printf("El cajero posee menos de %d\n", NAVISORETIRO);
+		format_messge(message, "El cajero posee menos de 5000, tenga esto en cuenta al momento de retirar.\n", 3);
+  		enviar(message, ds);
 	}
 	format_messge(message, "Monto a retirar: \n", 1);
   	enviar(message, ds);
@@ -209,20 +242,24 @@ void manejador_retiro(struct cliente * c, int ds){
 	    exit(-1);
 	}
 	total = -atoi(buffer);
-	if (total > 0){
+	if (total >= 0){
 		res = -1;
 		c->monto = 0;
+		set_error(c, "Monto incorrecto", ds);
+		return;
 	} else {
 		c->monto = total;
 		res = incrementar_monto(total);
 	}
 
-	if (res < 0){
-		printf("No se ha efectuado la transaccion.\n");
-		format_messge(message, "Ha ingresado un monto incorrecto, debe reiniciar la transaccion. \n", 3);
-  		enviar(message, ds);
+	// Se intento retirar mas de lo que hay en el cajero
+	if (res == -1){
 		c->monto = 0;
-	} else {
+		set_error(c, "Debe retirar un monto <= 3000.", ds);
+	} else if (res == -2){
+		c->monto = 0;
+		set_error(c, "El cajero no posee suficiente efectivo.", ds);
+	} else if (res >= 0) {
 		printf("Monto retirado\n");
 		format_messge(message, "Ha retirado su dinero.\n", 3);
   		enviar(message, ds);
@@ -233,8 +270,7 @@ void manejador_retiro(struct cliente * c, int ds){
 /* funcion para enviar el comprobante al cajero para ser emitido */
 /* c transaccion efectuada */
 /* descriptor file descriptor de comunicacion con el cajero */
-void enviar_hora(struct cliente * c, int descriptor){
-	char * inst[] = {"Deposito", "Retiro"};
+void enviar_comprobante(struct cliente * c, int descriptor){
 	time_t timer;
     char buffer[26];
     char r[100] = "Transaccion registrada: ";
@@ -244,7 +280,11 @@ void enviar_hora(struct cliente * c, int descriptor){
     tm_info = localtime(&timer);
     strftime(c->fecha, 26, "%Y-%m-%d %H:%M:%S", tm_info);
     strcpy(buffer,c->fecha);
-    sprintf(r,"%s [%s] = %s = %s",r,c->name,inst[(int)c->instruccion],buffer);
+    if (c->error){
+    	sprintf(r,"%s [%s] = %s = %s (%s)",r,c->name,inst[(int)c->instruccion],buffer, c->error_message);
+    } else {
+    	sprintf(r,"%s [%s] = %s = %s",r,c->name,inst[(int)c->instruccion],buffer);
+    }
 	format_messge(message, r, 3);
 	enviar(message, descriptor);
 }
@@ -255,9 +295,10 @@ void atencion_cliente(void * fd){
 	char message[MAXMSG];
 	int descriptor = *(int *) fd;
 	struct cliente *c = (struct cliente *)malloc(sizeof(struct cliente));
-	int numbytes = 0;
+	int numbytes = 0, opcion;
 	char buffer[10];
 
+	c->error = 0;
 	printf("Esperando identificacion de usuario..\n");
 	while(numbytes == 0){
 		if( (numbytes=recv(descriptor,buffer,10,0)) == -1){  
@@ -279,21 +320,22 @@ void atencion_cliente(void * fd){
 	}
 
 	if (numbytes != 0){
-  	int opcion;
-  	opcion = atoi(buffer);
-  	printf("Mensaje del Cliente[ %s ] : %s\n",c->name, buffer);
-  	switch (opcion) {
-  		case 1:
-  			manejador_deposito(c, descriptor);
-  			break;
-  		case 2:
-			manejador_retiro(c, descriptor);
-  			break;
-  		default:
-  			return;
-  		}
+	  	opcion = atoi(buffer);
+	  	printf("Opcion del cliente[ %s ] : %s\n",c->name, buffer);
+	  	switch (opcion) {
+	  		case 1:
+	  			manejador_deposito(c, descriptor);
+	  			break;
+	  		case 2:
+				manejador_retiro(c, descriptor);
+	  			break;
+	  		default:
+	  			c->instruccion = invalida;
+	  			set_error(c, "No se conoce el numero de operacion.", descriptor);
+	  			break;
+	  		}
   	}
-  	enviar_hora(c,descriptor);
+  	enviar_comprobante(c,descriptor);
   	agregar_movimiento(c);
   	agregar_movimiento_bitacora(c);
   	printf("Transaccion finalizada, cerrando descriptor %d\n", descriptor);
@@ -303,13 +345,12 @@ void atencion_cliente(void * fd){
 	return;
 }
 
-int main(){
+int main(int argc, char *argv[]){
 	inicializar();
 	int fde, fd2, numbytes;
 	struct sockaddr_in server; 
    	struct sockaddr_in client;
    	pthread_t client_t;
-    char buffer[10];
    	int size_sock = sizeof(struct sockaddr_in);
    	int option = 1;
    	// Creando socket
@@ -342,6 +383,7 @@ int main(){
     while(1){
     	if ( (fd2 = accept(fde, NULL , NULL))  < -1){
 	    		perror("Error en el Accept()");
+	    		exit(-1);
 	    }
 	    
 		printf("Cajero conectandose...\n");
