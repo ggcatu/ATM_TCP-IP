@@ -3,7 +3,7 @@
 Gabriel Gimenez 12-11006
 Guillermo Betancourt 11-10103
 
-Archivos: 
+## Archivos 
 	Makefile, contiene el makefile
 	central.c, contiene el codigo fuente del servidor
 	tcpechoclient.c, contiene el codigo fuente del cliente
@@ -12,12 +12,14 @@ Archivos:
 Se creo un sistema de cajero automatico, que permite retirar y depositar dinero desde el cliente.
 	
 Para generar los ejecutables:
+	
 	`make`
 
 El cajero automatico consta de 2 partes.
 
 El servidor, puede ser invocado en base a las siguientes especificaciones
-	`bsb_svr -l <puerto_bsb_svr> -i <bitácora_depósito> - o <bitácora_retiro>`
+
+`bsb_svr -l <puerto_bsb_svr> -i <bitácora_depósito> - o <bitácora_retiro>`
 
 Dónde:
 	<puerto_bsb_svr> Es el número de puerto local en que el computador central
@@ -41,23 +43,23 @@ Dónde:
 
 Durante la creacion se utilizaron como codigo_usuario, numeros de 4 digitos.
 
-Condiciones:
-	
-	Servidor:
-		Maximo de clientes 100
-		Monto inicial del cajero 8000
-		Maximo monto de retiro 3000
-		Numero de retiros diarios permitidos MAXNRETIROS 3
-		Largo maximo de mensaje del protocolo 300
-		Aviso al cliente cuando se posee menos de 5000
-		Cada cliente tiene que poseer un identificador de maximo 100 caracteres
-		Las fechas poseen maximo 30 caracteres
-		Los errores poseen maximo 100 caracteres
-		Los movimientos de las bitacoras poseen maximo 200 caracteres
-		Se utiliza el caracter especial '`' para encriptar los mensajes
-		Los montos recibidos desde el cliente deben tener maximo 10 caracteres
+## Condiciones:
 
-	Cliente:
-		Largo maximo de mensaje del protocolo 300
-		Numero maximo de intentos para conectar al servidor 3
-		// Codigo usuario 5 bytes?
+Servidor:
+	Maximo de clientes 100
+	Monto inicial del cajero 8000
+	Maximo monto de retiro 3000
+	Numero de retiros diarios permitidos MAXNRETIROS 3
+	Largo maximo de mensaje del protocolo 300
+	Aviso al cliente cuando se posee menos de 5000
+	Cada cliente tiene que poseer un identificador de maximo 100 caracteres
+	Las fechas poseen maximo 30 caracteres
+	Los errores poseen maximo 100 caracteres
+	Los movimientos de las bitacoras poseen maximo 200 caracteres
+	Se utiliza el caracter especial '`' para encriptar los mensajes
+	Los montos recibidos desde el cliente deben tener maximo 10 caracteres
+
+Cliente:
+	Largo maximo de mensaje del protocolo 300
+	Numero maximo de intentos para conectar al servidor 3
+	Codigo de usuario 100 caracteres
