@@ -41,6 +41,7 @@ Dónde:
 Durante la creacion se utilizaron como codigo_usuario, numeros de 4 digitos.
 
 Condiciones:
+	
 	Servidor:
 		Maximo de clientes 100
 		Monto inicial del cajero 8000

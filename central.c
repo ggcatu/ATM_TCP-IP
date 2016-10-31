@@ -10,20 +10,14 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <time.h>
-
+#include "general.c"
 //#define PUERTO 3550
 #define MAXCLIENT 100
 #define MINICIAL 8000
 #define MAXIMORETIRO 3000
 #define MAXNRETIROS 3
-#define MAXMSG 300
+#define MAXDATASIZE 300
 #define NAVISORETIRO 5000
-
-typedef enum {
-	deposito,
-	retiro,
-	invalida
-} transaccion;
 
 struct cliente {
 	int monto;
@@ -32,6 +26,7 @@ struct cliente {
 	char name[100];
 	char fecha[30];
 	char error_message[100];
+	struct message last_packet;
 };
 
 int monto_total, imov, fsocket;
@@ -40,8 +35,8 @@ pthread_mutex_t monto_mutex;
 pthread_mutex_t mov_mutex;
 pthread_mutex_t bit_mutex;
 struct cliente * movimientos[MAXCLIENT];
-char * inst[] = {"Deposito", "Retiro", "Invalida"};
 char * dvalue, * fretiro, * fdeposito;
+
 
 /* funcion que permite imprimir en pantalla un movimiento */
 /* c estructura de cliente a imprimir */
@@ -145,29 +140,6 @@ int verificarRetiros(struct cliente * c){
 	return k < MAXNRETIROS;
 }
 
-/* funcion para encriptar nuestros mensajes */
-/* string mensaje a ser encriptado */
-/* len largo del mensaje a ser encriptado */
-void xor(char * string, int len){
-	int i;
-	for(i = 0; i < len; i++){
-		string[i] = string[i] ^ '`';
-	}
-}
-
-
-/* estructura el mensaje para cumplir con el protocolo */
-/* msg buffer de resultado */
-/* m1  texto a enviar */
-/* code codigo de protocolo a enviar */
-void format_messge(char * msg, char * m1, int code){
-	memset(msg, 0, MAXMSG);
-	sprintf(msg, "%d - %s", code, m1);
-}
-
-/* funcion de comunicacion con el cliente, permite cumplir 
-facilemente con el protocolo asi como con la encriptacion */
-
 /* string mensaje a ser enviado, ya con el formato del protocolo */
 /* fd file descriptor por donde se enviara el mensaje */
 void enviar(char * string, int fd){
@@ -179,7 +151,10 @@ void enviar(char * string, int fd){
 	send(fd, string, len, 0);
 }
 
-
+/* funcion que maneja los errores durante las transacciones*/
+/* c estructura que mantiene informacion de la transaccion */
+/* mensaje mensaje de error */
+/* ds descriptor del cliente */
 void set_error(struct cliente * c, char * mensaje, int ds){
 	char message[300];
 	c->error = 1;
@@ -212,7 +187,7 @@ int incrementar_monto(int n){
 /* c estructura de cliente para almacenar la transaccion */
 /* ds descriptor utilizado para la comunicacion con el cliente */
 void manejador_deposito(struct cliente * c,int ds){
-	char message[MAXMSG];
+	char message[MAXDATASIZE];
 	char buffer[10];
 	int numbytes = 0;
 	int total;
@@ -220,11 +195,11 @@ void manejador_deposito(struct cliente * c,int ds){
 	printf("Iniciando manejador de deposito\n");
 	format_messge(message, "Monto a depositar: \n", 1);
   	enviar(message, ds);	
-  	if ( (numbytes=recv(ds,buffer,10,0)) == -1){  
-	    perror("Error en la llamada Recv()");
-	    exit(-1);
-	}
-	total = atoi(buffer);
+
+  	recibir_mensaje(buffer,ds);
+	parse_message(&c->last_packet, buffer);
+	total = atoi(c->last_packet.message);
+
 	if (total > 0){
 		c->monto = total;
 		incrementar_monto(total);
@@ -241,8 +216,8 @@ void manejador_deposito(struct cliente * c,int ds){
 /* c estructura de cliente para almacenar la transaccion */
 /* ds descriptor utilizado para la comunicacion con el cliente */
 void manejador_retiro(struct cliente * c, int ds){
-	char message[MAXMSG];
-	char buffer[10];
+	char message[MAXDATASIZE];
+	char buffer[300];
 	int numbytes = 0;
 	int total, res;
 	c->instruccion = retiro;
@@ -259,11 +234,11 @@ void manejador_retiro(struct cliente * c, int ds){
 	}
 	format_messge(message, "Monto a retirar: \n", 1);
   	enviar(message, ds);
-  	if ( (numbytes=recv(ds,buffer,10,0)) == -1){  
-	    perror("Error en la llamada Recv()");
-	    exit(-1);
-	}
-	total = -atoi(buffer);
+
+  	recibir_mensaje(buffer,ds);
+	parse_message(&c->last_packet, buffer);
+
+	total = -atoi(c->last_packet.message);
 	if (total >= 0){
 		res = -1;
 		c->monto = 0;
@@ -310,12 +285,10 @@ void enviar_comprobante(struct cliente * c, int descriptor){
 	enviar(message, descriptor);
 }
 
-
 /* modulo de atencion al cliente, una vez recibida una solicitud de conexion */
 /* fd descriptor utilizado para la comunicacion con el cliente */
 void atencion_cliente(void * fd){
-	
-	char message[MAXMSG];
+	char message[MAXDATASIZE];
 	int descriptor = *(int *) fd;
 	struct cliente *c = (struct cliente *)malloc(sizeof(struct cliente));
 	int numbytes = 0, opcion;
@@ -323,41 +296,33 @@ void atencion_cliente(void * fd){
 
 	c->error = 0;
 	printf("Esperando identificacion de usuario..\n");
-	while(numbytes == 0){
-		if( (numbytes=recv(descriptor,buffer,10,0)) == -1){  
-		      perror("Error en la llamada Recv()");
-		      exit(-1);
-	   	}
-	   	if (numbytes != 0){
-		  	strcpy(c->name, buffer);
-		  	bzero(buffer, 10); 
-	   	 }
-		
-	}
-	printf("Usuario [ %s ] conectado.\n", c->name);
-	format_messge(message, "Bienvenido, se te ha asignado un croceso.\n Selecciona tu opcion: \n -d. Depositar \n -r. Retirar \n", 0);
-	enviar(message, descriptor);
-	if ( (numbytes=recv(descriptor,buffer,10,0)) == -1){  
-	    perror("Error en la llamada Recv()");
-	    exit(-1);
-	}
 
-	if (numbytes != 0){
-	  	opcion = atoi(buffer);
-	  	printf("Opcion del cliente[ %s ] : %s\n",c->name, buffer);
-	  	switch (opcion) {
-	  		case 1:
-	  			manejador_deposito(c, descriptor);
-	  			break;
-	  		case 2:
-				manejador_retiro(c, descriptor);
-	  			break;
-	  		default:
-	  			c->instruccion = invalida;
-	  			set_error(c, "No se conoce el numero de operacion.", descriptor);
-	  			break;
-	  		}
-  	}
+	recibir_mensaje(buffer,descriptor);
+	parse_message(&c->last_packet, buffer);
+
+	strcpy(c->name,c->last_packet.message);
+	printf("Usuario [ %s ] conectado.\n", c->name);
+	format_messge(message, "Bienvenido, se te ha asignado un proceso.\n Selecciona tu opcion: \n -d. Depositar \n -r. Retirar \n", 0);
+	enviar(message, descriptor);
+
+	recibir_mensaje(buffer,descriptor);
+	parse_message(&c->last_packet, buffer);
+
+  	opcion = atoi(c->last_packet.message);
+  	printf("Opcion del cliente [ %s ] : %d\n",c->name, opcion);
+  	switch (opcion) {
+  		case 1:
+  			manejador_deposito(c, descriptor);
+  			break;
+  		case 2:
+			manejador_retiro(c, descriptor);
+  			break;
+  		default:
+  			c->instruccion = invalida;
+  			set_error(c, "No se conoce el numero de operacion.", descriptor);
+  			break;
+  		}
+  
   	enviar_comprobante(c,descriptor);
   	agregar_movimiento(c);
   	agregar_movimiento_bitacora(c);
@@ -375,8 +340,8 @@ void error_entrada(){
 
 int main(int argc, char *argv[]){
 	signal(SIGPIPE, SIG_IGN);
-	signal(SIGINT, reiniciar);
-	signal(SIGTSTP, finalizar);
+	signal(SIGTSTP, reiniciar);
+	signal(SIGINT, finalizar);
 	char * lvalue;
 	int fd2, numbytes, flags, lflag, iflag, oflag, port;
 	struct sockaddr_in server; 
@@ -452,5 +417,4 @@ int main(int argc, char *argv[]){
 			return 1;
 		}
     }
-
 }

@@ -7,32 +7,32 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-
-/* El número máximo de datos en bytes */
-#define MAXDATASIZE 300   
+#include "general.c"
 
 /* El numero maximo de intentos */
 #define MAXRETRY 3
 
-/* Estructura de mensaje */
-struct message {
-   char len[3];
-   int code;
-   char * message;
-};
-
 /* Funcion para enviar los mensajes al servidor */
 /* string es el texto a enviar */
 /* fd es el file descriptor por el que se enviara el send */
-int enviar(char * string, int fd){
+// int enviar(char * string, int fd){
+//    int len = strlen(string);
+//    int i;
+//    for( i = 0; i < MAXRETRY; i++ ){
+//       if ( send(fd, string, len, 0) > 0 ){
+//          return 0;
+//       }
+//       sleep(3000);
+//    } 
+// }
+
+void enviar(char * string, int fd){
+   char clen[3];
    int len = strlen(string);
-   int i;
-   for( i = 0; i < MAXRETRY; i++ ){
-      if ( send(fd, string, len, 0) > 0 ){
-         return 0;
-      }
-      sleep(3000);
-   } 
+   sprintf(clen, "%03d", len);
+   send(fd, clen, 3, 0);
+   xor(string,len);
+   send(fd, string, len, 0);
 }
 
 /* Funcion para conectarse al servidor */
@@ -52,61 +52,10 @@ int conectar(int * fd, struct sockaddr_in * server){
    return -1;
 }
 
-/* funcion para encriptar nuestros mensajes */
-/* string mensaje a ser encriptado */
-/* len largo del mensaje a ser encriptado */
-void xor(char * string, int len){
-   int i;
-   for(i = 0; i < len; i++){
-      string[i] = string[i] ^ '`';
-   }
-}
-
-/* Funcion para decodificar los mensajes del servidor */
-/* msg es una estructura destino donde se decodificara el mensaje */
-/* read es el mensaje recibido desde el servidor */
-void parse_message(struct message * msg, char * read){
-   msg->message = malloc(296 * sizeof(char));
-   if( sscanf(read, "%d - %[^\t]", &msg->code, msg->message) < 0){
-      printf("Error scanning: %s",read);
-   }
-   memset(read,0,MAXDATASIZE);
-}
-
 void error_entrada(){
    printf("Uso: bsb_cli -d <nombre_módulo_atención> -p <puerto_bsb_svr> -c <op>[d|r] -i <codigo_usuario>\n");
    exit(-1);
 }
-
-void recibir_mensaje(char * buffer, int fd){
-   int numbytes, tam;
-   int ctam = 0;
-   char tamc[3] = "", amc[3]= "";
-   char tmensaje[300] = "", mensaje[300] = "";
-   
-   while( ctam < 3){
-      if ((numbytes=recv(fd,amc,3-ctam,0)) == -1){
-         perror(" error Error \n");
-         exit(-1);
-      }
-      strcat(tamc, amc);
-      ctam+=numbytes;
-   }
-   tam = atoi(tamc);
-   ctam = 0;
-   while( ctam < tam){
-      if ((numbytes=recv(fd,mensaje,tam - ctam,0)) == -1){
-            perror(" error Error \n");
-            exit(-1);
-      }
-      strcat(tmensaje, mensaje);
-      ctam += numbytes;
-   }
-   xor(tmensaje, tam);
-   strcpy(buffer, tmensaje);
-}
-
-
 
 int main(int argc, char *argv[])
 {
@@ -114,6 +63,7 @@ int main(int argc, char *argv[])
    int fd, numbytes, flags, port, opcion = 0, opt;       
    int dflag = 0,pflag = 0,cflag = 0,iflag = 0;
    char * dvalue,* pvalue,* cvalue,* ivalue;
+   char buffer[300], mopt[2];
 
    /* en donde es almacenará el texto recibido */
    char buf[MAXDATASIZE];  
@@ -193,7 +143,8 @@ int main(int argc, char *argv[])
 
    /* se envia la identificacion del usuario */
    printf("Enviando identificacion\n");
-   send(fd,ivalue,5,0);
+   format_messge(buffer, ivalue, 0);
+   enviar(buffer,fd);
 
    /* manejador de mensajes recibidos */   
    msg->code = 10;
@@ -203,7 +154,9 @@ int main(int argc, char *argv[])
             /* enviando mensaje que indica tipo de transaccion */
             printf("%s\n",msg->message);
             sprintf(buf,"%d", opcion);
-            enviar(buf,fd);
+            format_messge(buffer, buf, 0);
+            enviar(buffer,fd);
+            //enviar(buf,fd);
             break;
          case 1:
             /* el servidor nos esta requiriendo una respuesta numerica */
@@ -213,7 +166,8 @@ int main(int argc, char *argv[])
                exit(-1);
             }
             sprintf(buf,"%d", opt);
-            enviar(buf,fd);
+            format_messge(buffer, buf, 1);
+            enviar(buffer,fd);
             break;
          case 2:
             /* el servidor nos indica que debemos mostrar un mensaje y cerrar nuestro cliente */
@@ -223,8 +177,15 @@ int main(int argc, char *argv[])
          case 3:
             printf("%s\n",msg->message);
             break;
+         default:
+            if (msg->code != 10){
+               printf("Se ha obtenido algo desconocido, %d, %s",msg->code, msg->message);
+               exit(-1);
+            }
+            break;   
+            
       }
-      
+
       recibir_mensaje(buf, fd);
       parse_message(msg, buf);
    }
