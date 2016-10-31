@@ -25,6 +25,7 @@ El servidor, puede ser invocado en base a las siguientes especificaciones
     bsb_svr -l <puerto_bsb_svr> -i <bitácora_depósito> - o <bitácora_retiro>
 
 Dónde:
+
     <puerto_bsb_svr> Es el número de puerto local en que el computador central
     ofrecerá el servicio
     <bitácora_depósito> Es el nombre y dirección relativa o absoluta de un archivo de
@@ -37,6 +38,7 @@ El cliente, puede ser invocado en base a las siguientes especificaciones
     bsb_cli -d <nombre_módulo_atención> -p <puerto_bsb_svr> - c <op> -i <codigo_usuario>
 
 Dónde:
+
     <nombre_módulo_atención>: Es el nombre de dominio o la dirección IP (versión 4)
     del equipo en donde se deberá ejecutar el módulo de atención centralizada.
     <puerto_bsb_svr>: Es el número de puerto remoto en que el módulo de servicio
