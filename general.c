@@ -8,12 +8,14 @@ struct message {
    char * message;
 };
 
+/* Estructura de tipo de transaccion */
 typedef enum {
   deposito,
   retiro,
   invalida
 } transaccion;
 
+/* Estructura auxiliar para imprimir tipo de transaccion */
 char * inst[] = {"Deposito", "Retiro", "Invalida"};
 
 /* funcion para encriptar nuestros mensajes */
@@ -63,6 +65,18 @@ void recibir_mensaje(char * buffer, int fd){
    }
    xor(tmensaje, tam);
    strcpy(buffer, tmensaje);
+}
+
+/* string mensaje a ser enviado, ya con el formato del protocolo */
+/* string es el texto a enviar */
+/* fd file descriptor por donde se enviara el mensaje */
+void enviar(char * string, int fd){
+  char clen[3];
+  int len = strlen(string);
+  sprintf(clen, "%03d", len);
+  send(fd, clen, 3, 0);
+  xor(string,len);
+  send(fd, string, len, 0);
 }
 
 /* Funcion para decodificar los mensajes del servidor */

@@ -22,7 +22,9 @@ El cajero automatico consta de 2 partes.
 
 El servidor, puede ser invocado en base a las siguientes especificaciones
 
-    bsb_svr -l <puerto_bsb_svr> -i <bitácora_depósito> - o <bitácora_retiro>
+    ./bsb_svr -l <puerto_bsb_svr> -i <bitácora_depósito> - o <bitácora_retiro>
+
+    ./bsb_svr -l 3550 -i deposito.txt -o retiro.txt
 
 Dónde:
 
@@ -35,7 +37,9 @@ Dónde:
 
 El cliente, puede ser invocado en base a las siguientes especificaciones
     
-    bsb_cli -d <nombre_módulo_atención> -p <puerto_bsb_svr> - c <op> -i <codigo_usuario>
+    .bsb_cli -d <nombre_módulo_atención> -p <puerto_bsb_svr> - c <op> -i <codigo_usuario>
+
+    ./bsb_cli -d localhost -p 3550 -c r -i 3223
 
 Dónde:
 
@@ -46,8 +50,6 @@ Dónde:
     <op>: Indica si el usuario va a depositar o retirar dinero del cajero, puede tener
     dos valores d ó r
     <código_usuario> Es un número serial que identifica un usuario de forma única
-
-Durante la creacion se utilizaron como codigo_usuario, numeros de 4 digitos.
 
 ## Condiciones:
 

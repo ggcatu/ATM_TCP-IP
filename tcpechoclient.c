@@ -12,29 +12,6 @@
 /* El numero maximo de intentos */
 #define MAXRETRY 3
 
-/* Funcion para enviar los mensajes al servidor */
-/* string es el texto a enviar */
-/* fd es el file descriptor por el que se enviara el send */
-// int enviar(char * string, int fd){
-//    int len = strlen(string);
-//    int i;
-//    for( i = 0; i < MAXRETRY; i++ ){
-//       if ( send(fd, string, len, 0) > 0 ){
-//          return 0;
-//       }
-//       sleep(3000);
-//    } 
-// }
-
-void enviar(char * string, int fd){
-   char clen[3];
-   int len = strlen(string);
-   sprintf(clen, "%03d", len);
-   send(fd, clen, 3, 0);
-   xor(string,len);
-   send(fd, string, len, 0);
-}
-
 /* Funcion para conectarse al servidor */
 /* fd es el file descriptor donde se conectara el servidor */
 /* server es una estructura sockaddr_in con la informacion del servidor */
@@ -52,6 +29,7 @@ int conectar(int * fd, struct sockaddr_in * server){
    return -1;
 }
 
+/* imprime un error y sale del programa, puesto que la invocacion fue incorrecta */
 void error_entrada(){
    printf("Uso: bsb_cli -d <nombre_módulo_atención> -p <puerto_bsb_svr> -c <op>[d|r] -i <codigo_usuario>\n");
    exit(-1);
@@ -63,10 +41,7 @@ int main(int argc, char *argv[])
    int fd, numbytes, flags, port, opcion = 0, opt;       
    int dflag = 0,pflag = 0,cflag = 0,iflag = 0;
    char * dvalue,* pvalue,* cvalue,* ivalue;
-   char buffer[300], mopt[2];
-
-   /* en donde es almacenará el texto recibido */
-   char buf[MAXDATASIZE];  
+   char buf[MAXDATASIZE], buffer[MAXDATASIZE];
 
    /* estructura que recibirá información sobre el nodo remoto */
    struct hostent *he;         
@@ -104,6 +79,7 @@ int main(int argc, char *argv[])
          error_entrada();
        }
    }
+   /* verifica que todos los flags fueron activados */
    if (dflag + pflag + cflag + iflag != 4){
       error_entrada();
    }
@@ -175,6 +151,7 @@ int main(int argc, char *argv[])
             exit(1);
             break;
          case 3:
+            /* el servidor nos indica que debemos mostrar un mensaje recibir el siguiente */
             printf("%s\n",msg->message);
             break;
          default:
@@ -185,12 +162,13 @@ int main(int argc, char *argv[])
             break;   
             
       }
-
+      /* recibir mensajes del servidor */
       recibir_mensaje(buf, fd);
       parse_message(msg, buf);
    }
 
    /* liberamos la estructura de mensaje */
+   free(msg->message);
    free(msg);
    
    /* cerramos el fd de comunicacion */

@@ -19,6 +19,7 @@
 #define MAXDATASIZE 300
 #define NAVISORETIRO 5000
 
+/* estructura que mantiene una transaccion de un cliente */
 struct cliente {
 	int monto;
 	int error;
@@ -78,7 +79,6 @@ void finalizar_bitacora(){
 	escribir_bitacora(temp, fretiro);
 }
 
-
 /* funcion para escribir un movimiento en la bitacora */
 /* c movimiento a escribir en la bitacora */
 void agregar_movimiento_bitacora(struct cliente * c){
@@ -120,7 +120,7 @@ void reiniciar(){
 /* movimiento a ser guardado */
 void agregar_movimiento(struct cliente * c){
 	pthread_mutex_lock( &mov_mutex );
-	// Escribir movimiento en bitacora;
+	agregar_movimiento_bitacora(c);
 	movimientos[imov] = c;
 	imov++;
 	pthread_mutex_unlock( &mov_mutex );
@@ -140,16 +140,6 @@ int verificarRetiros(struct cliente * c){
 	return k < MAXNRETIROS;
 }
 
-/* string mensaje a ser enviado, ya con el formato del protocolo */
-/* fd file descriptor por donde se enviara el mensaje */
-void enviar(char * string, int fd){
-	char clen[3];
-	int len = strlen(string);
-	sprintf(clen, "%03d", len);
-	send(fd, clen, 3, 0);
-	xor(string,len);
-	send(fd, string, len, 0);
-}
 
 /* funcion que maneja los errores durante las transacciones*/
 /* c estructura que mantiene informacion de la transaccion */
@@ -325,7 +315,6 @@ void atencion_cliente(void * fd){
   
   	enviar_comprobante(c,descriptor);
   	agregar_movimiento(c);
-  	agregar_movimiento_bitacora(c);
   	printf("Transaccion finalizada, cerrando descriptor %d\n", descriptor);
 	format_messge(message, "Transaccion finalizada.", 2);
 	enviar(message, descriptor);
@@ -334,6 +323,7 @@ void atencion_cliente(void * fd){
 	return;
 }
 
+/* imprime un error y sale del programa, puesto que la invocacion fue incorrecta */
 void error_entrada(){
    printf("Uso: bsb_svr -l <puerto a ofrecer> -i <bitacora de deposito> -o <bitacora de retiro>\n");
    exit(-1);
@@ -371,6 +361,8 @@ int main(int argc, char *argv[]){
     }
 
     port = atoi(lvalue);
+
+    /* verifica que todos los flags fueron activados */
     if (oflag + iflag + lflag != 3){
     	error_entrada();
     	exit(-1);
