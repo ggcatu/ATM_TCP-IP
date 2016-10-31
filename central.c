@@ -204,7 +204,7 @@ int incrementar_monto(int n){
 	pthread_mutex_lock( &monto_mutex );
 	monto_total += n;
 	pthread_mutex_unlock( &monto_mutex );
-	printf("New ammount: %d\n", monto_total);
+	printf("Monto disponible en el cajero: %d\n", monto_total);
 	return 1;
 }
 
