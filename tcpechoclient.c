@@ -14,6 +14,10 @@
 /* El numero maximo de intentos */
 #define MAXRETRY 3
 
+
+
+
+
 /* Estructura de mensaje */
 struct message {
    char len[3];
@@ -52,6 +56,9 @@ int conectar(int * fd, struct sockaddr_in * server){
    return -1;
 }
 
+/* funcion para encriptar nuestros mensajes */
+/* string mensaje a ser encriptado */
+/* len largo del mensaje a ser encriptado */
 void xor(char * string, int len){
    int i;
    for(i = 0; i < len; i++){

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <signal.h>
 #include <unistd.h>
 #include <netdb.h>   
 #include <string.h>
@@ -76,7 +77,7 @@ void escribir_bitacora(char * string){
 /* funcion de finalizacion de dia para la bitacora */
 void finalizar_bitacora(){
 	f = fopen("log.txt", "a");
-    fprintf(f, "Cerrando dia. Monto disponible: %d", monto_total);
+    fprintf(f, "Cerrando dia. Monto disponible: %d\n", monto_total);
     fclose(f);
 }
 
@@ -97,6 +98,19 @@ void inicializar(){
 	monto_total = MINICIAL;
 	imov = 0;
 	inicializar_bitacora();
+	printf("Cajero inicializando.\n");
+}
+
+/* funcion de finalizacion del cajero */
+void finalizar(){
+	finalizar_bitacora();
+	exit(1);
+}
+
+/* funcion de reinicio de dia del cajero */
+void reiniciar(){
+	finalizar_bitacora();
+	inicializar();
 }
 
 /* funcion para guardar un movimiento en nuestra memoria */
@@ -289,9 +303,11 @@ void enviar_comprobante(struct cliente * c, int descriptor){
 	enviar(message, descriptor);
 }
 
+
 /* modulo de atencion al cliente, una vez recibida una solicitud de conexion */
 /* fd descriptor utilizado para la comunicacion con el cliente */
 void atencion_cliente(void * fd){
+	
 	char message[MAXMSG];
 	int descriptor = *(int *) fd;
 	struct cliente *c = (struct cliente *)malloc(sizeof(struct cliente));
@@ -347,6 +363,9 @@ void atencion_cliente(void * fd){
 
 int main(int argc, char *argv[]){
 	inicializar();
+	signal(SIGPIPE, SIG_IGN);
+	signal(SIGINT, reiniciar);
+	signal(SIGTSTP, finalizar);
 	int fde, fd2, numbytes;
 	struct sockaddr_in server; 
    	struct sockaddr_in client;
